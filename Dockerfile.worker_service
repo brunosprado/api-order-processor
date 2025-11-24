@@ -1,0 +1,14 @@
+# Multi-stage build for Go Worker Service
+FROM golang:1.24.1-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -o worker_service ./cmd/worker
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/worker_service ./worker_service
+RUN apk add --no-cache bash
+ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh /wait-for-it.sh
+RUN chmod +x /wait-for-it.sh
+CMD ["/wait-for-it.sh", "mongodb:27017", "--", "/wait-for-it.sh", "rabbitmq:5672", "--", "./worker_service"]
